@@ -5,7 +5,7 @@
 //! and pushes a [`Change`] that can be applied in either direction.
 
 use crate::geom::V2;
-use crate::model::{Document, Node, NodeId};
+use crate::model::{Comment, Document, Node, NodeId};
 use std::collections::HashMap;
 
 const MAX_DEPTH: usize = 500;
@@ -24,6 +24,7 @@ pub struct Change {
     root: Option<(Vec<NodeId>, Vec<NodeId>)>,
     next_id: (u64, u64),
     coalesce_key: Option<String>,
+    comments: Option<(Vec<Comment>, Vec<Comment>)>,
 }
 
 impl Change {
@@ -46,6 +47,13 @@ impl Change {
                 before.clone()
             };
         }
+        if let Some((before, after)) = &self.comments {
+            doc.comments = if forward {
+                after.clone()
+            } else {
+                before.clone()
+            };
+        }
         doc.next_id = if forward {
             self.next_id.1
         } else {
@@ -62,6 +70,7 @@ pub struct Recording {
     order: Vec<NodeId>,
     root_before: Option<Vec<NodeId>>,
     next_id_before: u64,
+    comments_before: Option<Vec<Comment>>,
 }
 
 impl Recording {
@@ -123,6 +132,13 @@ impl<'a> Tx<'a> {
         self.doc.nodes.get_mut(&id)
     }
 
+    pub fn comments_mut(&mut self) -> &mut Vec<Comment> {
+        if self.rec.comments_before.is_none() {
+            self.rec.comments_before = Some(self.doc.comments.clone());
+        }
+        &mut self.doc.comments
+    }
+
     pub fn alloc_id(&mut self) -> NodeId {
         self.doc.alloc_id()
     }
@@ -157,6 +173,18 @@ impl<'a> Tx<'a> {
         let Some(parent) = self.doc.get(id).map(|n| n.parent) else {
             return;
         };
+        let removed = self.doc.subtree(id);
+        let anchors: Vec<_> = self
+            .doc
+            .comments
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| removed.contains(&c.target))
+            .map(|(i, c)| (i, c.position(self.doc)))
+            .collect();
+        for (i, at) in anchors {
+            self.comments_mut()[i].fallback = at;
+        }
         self.touch_parent_list(parent);
         if let Some(list) = self.doc.children_mut(parent) {
             list.retain(|c| *c != id);
@@ -229,7 +257,11 @@ impl History {
             .root_before
             .filter(|b| *b != doc.root)
             .map(|b| (b, doc.root.clone()));
-        if entries.is_empty() && root.is_none() {
+        let comments = rec
+            .comments_before
+            .filter(|b| *b != doc.comments)
+            .map(|b| (b, doc.comments.clone()));
+        if entries.is_empty() && root.is_none() && comments.is_none() {
             return false;
         }
         let change = Change {
@@ -238,6 +270,7 @@ impl History {
             root,
             next_id: (rec.next_id_before, doc.next_id),
             coalesce_key,
+            comments,
         };
         self.generation += 1;
         if let (Some(key), Some(top)) = (&change.coalesce_key, self.undo.last_mut())
@@ -309,6 +342,11 @@ fn merge(older: &mut Change, newer: Change) {
     match (&mut older.root, newer.root) {
         (Some((_, after)), Some((_, new_after))) => *after = new_after,
         (r @ None, Some(nr)) => *r = Some(nr),
+        _ => {}
+    }
+    match (&mut older.comments, newer.comments) {
+        (Some((_, after)), Some((_, new_after))) => *after = new_after,
+        (c @ None, Some(nc)) => *c = Some(nc),
         _ => {}
     }
     older.next_id.1 = newer.next_id.1;

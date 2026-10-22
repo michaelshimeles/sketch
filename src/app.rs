@@ -514,6 +514,12 @@ impl App {
 
     fn handle_requests(&mut self) {
         for req in std::mem::take(&mut self.ed.requests) {
+            if self.ed.comment_draft.is_some()
+                && matches!(req, AppRequest::Home | AppRequest::New | AppRequest::Open)
+            {
+                self.ed.status = "Post or cancel your comment before changing projects".into();
+                continue;
+            }
             match req {
                 AppRequest::Home => self.go_home(),
                 AppRequest::ImageFill(ids, i) => {

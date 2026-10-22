@@ -1,3 +1,5 @@
+pub mod comment;
+pub use comment::Comment;
 pub mod document;
 pub mod node;
 pub mod paint;

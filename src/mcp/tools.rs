@@ -78,6 +78,48 @@ pub fn definitions() -> Vec<Value> {
     let node_id = |d: &str| json!({"type": "string", "description": d});
     let ids = |d: &str| json!({"type": "array", "items": {"type": "string"}, "description": d});
     vec![
+        tool(
+            "list_comments",
+            "List element-pinned comments across the open project, with target context. Defaults to open; paginate using total, offset and limit.",
+            json!({"pageId":page_id(),"status":{"type":"string","enum":["open","resolved","all"]},"limit":{"type":"integer","minimum":1,"maximum":500},"offset":{"type":"integer","minimum":0}}),
+            &[],
+            true,
+        ),
+        tool(
+            "get_comment",
+            "Read one pinned comment including its target text, ancestors, bounds and missing-target status.",
+            json!({"commentId":{"type":"string"}}),
+            &["commentId"],
+            true,
+        ),
+        tool(
+            "add_comment",
+            "Add ordinary feedback pinned to a node. x/y are optional world coordinates inside the target; omit both for its center. Separate metadata, not a design layer.",
+            json!({"nodeId":node_id("Target element"),"pageId":page_id(),"body":{"type":"string","minLength":1,"maxLength":10000},"x":{"type":"number"},"y":{"type":"number"}}),
+            &["nodeId", "body"],
+            false,
+        ),
+        tool(
+            "update_comment",
+            "Edit a comment body, preserving its anchor and status.",
+            json!({"commentId":{"type":"string"},"body":{"type":"string","minLength":1,"maxLength":10000}}),
+            &["commentId", "body"],
+            false,
+        ),
+        tool(
+            "delete_comment",
+            "Delete a comment. Undo restores it.",
+            json!({"commentId":{"type":"string"}}),
+            &["commentId"],
+            false,
+        ),
+        tool(
+            "set_comment_status",
+            "Resolve verified feedback or reopen it. Unfinished feedback stays open.",
+            json!({"commentId":{"type":"string"},"status":{"type":"string","enum":["open","resolved"]}}),
+            &["commentId", "status"],
+            false,
+        ),
         // ------------------------------------------------------------ projects and pages
         tool(
             "list_resources",
@@ -465,6 +507,8 @@ pub fn definitions() -> Vec<Value> {
 
 pub const GUIDE_INSTRUCTIONS: &str = "\
 # Designing in Sketch over MCP
+
+Comments: list_comments (open by default) and get_comment return element-pinned feedback. Apply a batch, verify with screenshots, then set_comment_status to resolved. Use add_comment / update_comment / delete_comment for feedback; comments are saved metadata, never design layers.
 
 1. Orient: get_basic_info → pages, artboards, sizes; get_selection → what the user points at.
 2. Plan a brief before a new design: palette (3–5 colors), type scale (e.g. 12/14/16/20/28/40),

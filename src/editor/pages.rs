@@ -92,6 +92,10 @@ impl Editor {
 
     /// Make page `i` active, parking the current one.
     pub fn switch_page(&mut self, i: usize) {
+        if self.comment_draft.is_some() {
+            self.status = "Post or cancel your comment before changing pages".into();
+            return;
+        }
         if i == self.active_page || i >= self.pages.len() {
             return;
         }
@@ -187,7 +191,10 @@ impl Editor {
             return self.active_page;
         }
         self.commit();
-        let src = self.page_data(i);
+        let mut src = self.page_data(i);
+        for c in &mut src.doc.comments {
+            c.id = new_id();
+        }
         let name = self.unique_page_name(&format!("{} copy", src.name));
         let mut slot = PageSlot::new(&name);
         slot.saved_gen = u64::MAX;
@@ -228,6 +235,9 @@ impl Editor {
 
     /// Delete page `i` (never the last one). Returns the removed page id for file cleanup.
     pub fn delete_page(&mut self, i: usize) -> Option<String> {
+        if self.comment_draft.is_some() {
+            return None;
+        }
         if self.pages.len() <= 1 || i >= self.pages.len() {
             return None;
         }

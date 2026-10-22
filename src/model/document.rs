@@ -12,6 +12,8 @@ pub struct Document {
     /// Top-level nodes in paint order, bottom to top.
     pub root: Vec<NodeId>,
     pub next_id: u64,
+    #[serde(default)]
+    pub comments: Vec<super::Comment>,
 }
 
 impl Default for Document {
@@ -21,6 +23,7 @@ impl Default for Document {
             nodes: HashMap::new(),
             root: Vec::new(),
             next_id: 1,
+            comments: Vec::new(),
         }
     }
 }
@@ -150,6 +153,22 @@ impl Document {
 
     /// Structural invariants, used by tests and after loading files.
     pub fn validate(&self) -> Result<(), String> {
+        let mut comment_ids = std::collections::HashSet::new();
+        for c in &self.comments {
+            if c.id.is_empty()
+                || !comment_ids.insert(&c.id)
+                || c.body.trim().is_empty()
+                || c.body.chars().count() > 10_000
+                || !c.relative.x.is_finite()
+                || !c.relative.y.is_finite()
+                || !(0.0..=1.0).contains(&c.relative.x)
+                || !(0.0..=1.0).contains(&c.relative.y)
+                || !c.fallback.x.is_finite()
+                || !c.fallback.y.is_finite()
+            {
+                return Err("invalid comment metadata".into());
+            }
+        }
         let mut seen = std::collections::HashSet::new();
         let mut check = |ids: &[NodeId], parent: Option<NodeId>| -> Result<(), String> {
             for id in ids {

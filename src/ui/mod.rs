@@ -1,6 +1,7 @@
 //! egui chrome: menu bar, layers panel, design (properties) panel, floating toolbar, and the
 //! projects home screen.
 
+pub mod comments;
 pub mod home;
 pub mod inspector;
 pub mod library;
@@ -17,6 +18,7 @@ use std::collections::HashSet;
 #[derive(Default)]
 pub struct UiState {
     pub collapsed: HashSet<NodeId>,
+    pub comments: comments::CommentsUi,
     pub renaming: Option<(NodeId, String)>,
     pub show_help: bool,
     pub show_grid_off: bool,
@@ -151,8 +153,15 @@ pub fn draw(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) -> egui::Rect {
                 .fill(p.inspector)
                 .inner_margin(egui::Margin::symmetric(14, 10)),
         )
-        .show(ui, |ui| inspector::panel(ui, ed, st));
+        .show(ui, |ui| {
+            if ed.tool == Tool::Comment || st.comments.open {
+                comments::panel(ui, ed, &mut st.comments);
+            } else {
+                inspector::panel(ui, ed, st);
+            }
+        });
     let canvas = ui.available_rect_before_wrap();
+    comments::overlay(ui.ctx(), ed, &mut st.comments, canvas);
     toolbar(ui.ctx(), ed, canvas);
     status(ui.ctx(), ed, canvas);
     palette::draw(ui.ctx(), ed, st, canvas);
@@ -200,6 +209,24 @@ fn top_bar(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) {
             .clicked()
         {
             ed.requests.push(crate::editor::AppRequest::Home);
+        }
+        if theme::icon_button(
+            ui,
+            Icon::Comment,
+            26.0,
+            st.comments.open || ed.tool == Tool::Comment,
+        )
+        .on_hover_text("Comments (C)")
+        .clicked()
+        {
+            if ed.comment_draft.is_none() {
+                st.comments.open = !st.comments.open;
+                ed.run(Action::Tool(if st.comments.open {
+                    Tool::Comment
+                } else {
+                    Tool::Select
+                }));
+            }
         }
         ui.add_space(4.0);
         let title = if st.project_name.is_empty() {
@@ -279,7 +306,7 @@ fn menu_bar(ui: &mut Ui, ed: &mut Editor) {
 }
 
 fn layers(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) {
-    pages::panel(ui, ed, st);
+    ui.add_enabled_ui(ed.comment_draft.is_none(), |ui| pages::panel(ui, ed, st));
     ui.add_space(4.0);
     let r = ui.available_rect_before_wrap();
     ui.painter().hline(
@@ -674,6 +701,7 @@ fn tool_icon(t: Tool) -> Icon {
         Tool::Arrow => Icon::Arrow,
         Tool::Sticky => Icon::Sticky,
         Tool::Laser => Icon::Laser,
+        Tool::Comment => Icon::Comment,
         Tool::Star => Icon::Star,
         Tool::Pen => Icon::Pen,
         Tool::Line => Icon::Line,

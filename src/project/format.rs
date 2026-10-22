@@ -23,7 +23,7 @@ pub const OLD_LEGACY_FORMAT: &str = "paper-rs";
 
 pub const PROJECT_VERSION: u32 = 1;
 /// v1: legacy single file. v2: page file inside a project. v3: fill layers (`fills`).
-pub const PAGE_VERSION: u32 = 3;
+pub const PAGE_VERSION: u32 = 4;
 
 #[derive(Debug)]
 pub enum FormatError {
@@ -137,10 +137,12 @@ struct PageFile {
     next_id: u64,
     root: Vec<NodeId>,
     nodes: Vec<Node>,
+    #[serde(default)]
+    comments: Vec<crate::model::Comment>,
 }
 
 /// Page migrations, indexed by source version: `PAGE_STEPS[0]` turns v1 into v2.
-const PAGE_STEPS: &[fn(Value) -> Value] = &[page_v1_to_v2, page_v2_to_v3];
+const PAGE_STEPS: &[fn(Value) -> Value] = &[page_v1_to_v2, page_v2_to_v3, page_v3_to_v4];
 /// Formats accepted as older versions of a page.
 const PAGE_ALIASES: &[&str] = &[LEGACY_FORMAT, OLD_LEGACY_FORMAT, OLD_PAGE_FORMAT];
 
@@ -173,6 +175,11 @@ fn page_v2_to_v3(mut v: Value) -> Value {
     v
 }
 
+fn page_v3_to_v4(mut v: Value) -> Value {
+    v["comments"] = json!([]);
+    v
+}
+
 pub fn page_to_json(p: &PageData) -> String {
     let mut nodes: Vec<Node> = p.doc.nodes.values().cloned().collect();
     nodes.sort_by_key(|n| n.id);
@@ -185,6 +192,7 @@ pub fn page_to_json(p: &PageData) -> String {
         next_id: p.doc.next_id,
         root: p.doc.root.clone(),
         nodes,
+        comments: p.doc.comments.clone(),
     };
     serde_json::to_string_pretty(&f).expect("page serializes")
 }
@@ -201,6 +209,7 @@ pub fn page_from_json(s: &str) -> Result<PageData, FormatError> {
         nodes,
         root: f.root,
         next_id: f.next_id.max(max_id + 1),
+        comments: f.comments,
     };
     doc.validate().map_err(FormatError::Invalid)?;
     Ok(PageData {
@@ -328,7 +337,7 @@ mod tests {
         assert_eq!(r.style.fill(), Some(crate::model::Color::rgb(255, 0, 0)));
         assert_eq!(r.style.corner_radius, 2.0);
         assert!(p.doc.get(NodeId(2)).unwrap().style.fills.is_empty());
-        assert!(page_to_json(&p).contains("\"version\": 3"));
+        assert!(page_to_json(&p).contains("\"version\": 4"));
     }
 
     #[test]

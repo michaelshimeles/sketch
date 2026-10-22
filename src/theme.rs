@@ -333,6 +333,7 @@ pub enum Icon {
     SpaceBetween,
     Arrow,
     Sticky,
+    Comment,
     Diamond,
     Laser,
     Library,
@@ -349,6 +350,19 @@ pub fn paint_icon(painter: &egui::Painter, rect: Rect, icon: Icon, color: Color3
     let line = |pts: &[Pos2]| painter.add(egui::Shape::line(pts.to_vec(), st));
     let closed = |pts: &[Pos2]| painter.add(egui::Shape::closed_line(pts.to_vec(), st));
     match icon {
+        Icon::Comment => {
+            closed(&[
+                pt(2.5, 3.0),
+                pt(13.5, 3.0),
+                pt(13.5, 11.0),
+                pt(7.0, 11.0),
+                pt(3.0, 14.0),
+                pt(3.0, 11.0),
+                pt(2.5, 11.0),
+            ]);
+            line(&[pt(5.0, 6.0), pt(11.0, 6.0)]);
+            line(&[pt(5.0, 8.5), pt(9.0, 8.5)]);
+        }
         Icon::Pointer => {
             closed(&[
                 pt(4.5, 2.5),

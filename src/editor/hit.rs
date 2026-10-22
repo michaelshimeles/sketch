@@ -117,3 +117,12 @@ pub const HANDLES: [(f64, f64); 8] = [
     (0.0, 1.0),
     (0.0, 0.5),
 ];
+
+/// Comments may reference locked elements without unlocking or selecting them.
+pub fn comment_hit_test(doc: &Document, p: V2, zoom: f64) -> Option<NodeId> {
+    doc.paint_order().into_iter().rev().find(|id| {
+        doc.is_effectively_visible(*id)
+            && node_contains(doc, *id, p, zoom)
+            && inside_ancestor_clips(doc, *id, p)
+    })
+}

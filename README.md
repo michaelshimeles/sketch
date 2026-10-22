@@ -101,6 +101,24 @@ sketch-rs --export out_dir PROJECT_DIR --format png --scope frames  # a folder o
 sketch-rs --import board.excalidraw                                 # new project, prints its folder
 ```
 
+## Element comments
+
+Press **C** or click the comment bubble to point at design elements. Hover shows the target;
+click to write feedback in a compact composer. Choose an ancestor in the breadcrumb to
+reference a whole card instead of its text. Post with Command+Enter or the Post button,
+then add another comment. Escape cancels a draft. No sticky note or naming prefix is needed.
+
+Comments appear as numbered pins and in the Comments panel. Pins follow their elements when
+moved or resized. Resolve, reopen, edit, or delete feedback from the panel. Deleted elements
+leave an identifiable comment; undoing the deletion restores its pin. Comments autosave and
+support undo/redo, but never appear in design exports. Pages saved with comments require this
+local build; keep a backup before returning to an older release.
+
+Agents can collect a batch with `list_comments`, inspect targets with `get_comment`, make
+changes, verify them, then call `set_comment_status` to resolve completed feedback. Comments
+added during the batch can wait until the next run. This local feature has no accounts or
+remote synchronization.
+
 ## AI agents (MCP)
 
 ![A sign-in screen written by an agent through write_html](docs/screenshots/milestone7_mcp.png)
@@ -160,6 +178,7 @@ written for Paper work here too.
 | Read | `get_basic_info`, `get_selection`, `get_node_info`, `get_children`, `get_tree_summary`, `get_computed_styles`, `get_jsx`, `find_nodes`, `get_fill_image`, `get_font_family_info`, `get_guide` |
 | See | `get_screenshot` (PNG image content of a node or the page), `export` (PNG/SVG/PDF files), `export_combined_pdf` |
 | Write | `create_artboard`, `write_html`, `update_styles`, `set_text_content`, `rename_nodes`, `duplicate_nodes`, `move_nodes`, `delete_nodes`, `finish_working_on_nodes` (saves) |
+| Comments | `list_comments`, `get_comment`, `add_comment`, `update_comment`, `delete_comment`, `set_comment_status` |
 | Sketch extras | `create_shape` (rectangles, ellipses, diamonds, stars, stickies, text, lines, arrows bound to shapes), `select_nodes`, `undo`, `redo` |
 
 `write_html` takes HTML with inline styles: flexbox (`display:flex`, direction, gap, padding,
@@ -319,7 +338,7 @@ Known gaps), ⏳ planned in a later milestone, ❌ not planned.
   inside shapes stays a separate text layer (except sticky notes), and fonts map to Inter.
   SVG patterns, filters, masks and clip paths are not imported.
 * **MCP**: one project is open at a time, so `fileId` must name the open project (call
-  `open_file` to switch; the user's window switches too). No design tokens, comments or AI
+  `open_file` to switch; the user's window switches too). No design tokens or AI
   image generation (Paper has them). Moving or duplicating layers between pages isn't
   supported. Remote `http(s)` images aren't fetched; pass a local path or a `data:` URI.
   CSS margin, grid, shadows and transforms are reported back as ignored styles.

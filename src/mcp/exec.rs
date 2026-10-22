@@ -6,6 +6,9 @@
 //! transaction each (`Editor::edit`), so they undo in one step and refresh the window;
 //! writes to other pages go to that page's own document and history (`Editor::with_page`).
 
+#[path = "comments.rs"]
+mod comments;
+
 use super::css::{self, Context, Styles};
 use super::html::{self, Element, Html};
 use super::{Out, ToolResult, tools};
@@ -270,6 +273,8 @@ pub fn call(host: &mut dyn Host, name: &str, args: &Value) -> ToolResult {
                 "get_computed_styles" => computed_styles(ed, &a),
                 "get_fill_image" => fill_image(ed, &a),
                 "find_nodes" => find_nodes(ed, &a),
+                "list_comments" | "get_comment" | "add_comment" | "update_comment"
+                | "delete_comment" | "set_comment_status" => comments::call(ed, name, &a),
                 "export" => export(host, &a),
                 "export_combined_pdf" => export_pdf(host, &a),
                 "create_artboard" => create_artboard(ed, &a),
@@ -383,6 +388,9 @@ fn list_resources(host: &mut dyn Host, a: &Args) -> ToolResult {
 }
 
 fn open_file(host: &mut dyn Host, a: &Args) -> ToolResult {
+    if host.editor().comment_draft.is_some() {
+        return Err("Post or cancel the open comment draft before changing projects".into());
+    }
     let dir = find_project(host.store(), a.req_str("fileId")?)?;
     let already = host.canvas_open() && host.project().is_some_and(|p| same_dir(&p.dir, &dir));
     if !already {

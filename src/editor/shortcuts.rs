@@ -108,6 +108,7 @@ fn bindings() -> Vec<(Key, Chord, Action, &'static str)> {
     use Action as A;
     use Key::*;
     vec![
+        (Char('c'), PLAIN, A::Tool(Tool::Comment), "Comment tool"),
         (Char('v'), PLAIN, A::Tool(Tool::Select), "Select tool"),
         (
             Char('h'),

@@ -3,6 +3,7 @@
 //! It consumes platform-agnostic [`InputEvent`]s, so every interaction can be scripted in tests.
 
 pub mod commands;
+pub mod comments;
 pub mod hit;
 pub mod input;
 pub mod pages;
@@ -41,10 +42,11 @@ pub enum Tool {
     Pencil,
     Eraser,
     Laser,
+    Comment,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 16] = [
+    pub const ALL: [Tool; 17] = [
         Tool::Select,
         Tool::Hand,
         Tool::Frame,
@@ -61,6 +63,7 @@ impl Tool {
         Tool::Pencil,
         Tool::Eraser,
         Tool::Laser,
+        Tool::Comment,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -80,6 +83,7 @@ impl Tool {
             Tool::Pencil => "Pencil",
             Tool::Eraser => "Eraser",
             Tool::Laser => "Laser pointer",
+            Tool::Comment => "Comment",
         }
     }
     pub fn shortcut(self) -> &'static str {
@@ -100,6 +104,7 @@ impl Tool {
             Tool::Pencil => "⇧P",
             Tool::Eraser => "E",
             Tool::Laser => "K",
+            Tool::Comment => "C",
         }
     }
 }
@@ -268,6 +273,8 @@ pub struct Editor {
     /// Hand-drawn style for new shapes (None = clean lines).
     pub sketch: Option<crate::model::rough::Rough>,
     pub sticky_color: Color,
+    pub comment_draft: Option<comments::Draft>,
+    pub focused_comment: Option<String>,
     /// Requests for the chrome (command palette, rename...).
     pub ui_events: Vec<commands::UiEvent>,
     /// System clipboard (set by the app; None in tests unless injected).
@@ -334,6 +341,8 @@ impl Editor {
             arrow_route: crate::model::Route::Straight,
             sketch: None,
             sticky_color: Color::rgb(0xff, 0xdf, 0x6b),
+            comment_draft: None,
+            focused_comment: None,
             ui_events: Vec::new(),
             clipboard_style: None,
             clipboard_io: None,
@@ -677,6 +686,11 @@ impl Editor {
         self.last_click = Some((pos, time_ms));
 
         match self.tool {
+            Tool::Comment => {
+                if let Some(target) = hit::comment_hit_test(&self.doc, world, self.camera.zoom) {
+                    self.start_comment(target, world);
+                }
+            }
             Tool::Select | Tool::Hand => self.select_down(pos, world, double),
             Tool::Pencil => {
                 self.end_text_edit();
@@ -1043,7 +1057,9 @@ impl Editor {
         let world = self.screen_to_world(pos);
         match std::mem::replace(&mut self.gesture, Gesture::None) {
             Gesture::None => {
-                self.hover = if self.tool == Tool::Select {
+                self.hover = if self.tool == Tool::Comment {
+                    hit::comment_hit_test(&self.doc, world, self.camera.zoom)
+                } else if self.tool == Tool::Select {
                     self.label_at(pos)
                         .or_else(|| hit::hit_test(&self.doc, world, self.camera.zoom))
                 } else {
@@ -1795,12 +1811,24 @@ impl Editor {
         use shortcuts::Action as A;
         match action {
             A::Tool(t) => {
+                if self.comment_draft.is_some() {
+                    self.status = "Post or cancel your comment first".into();
+                    return;
+                }
                 self.end_text_edit();
                 self.finish_pen();
                 self.path_edit = None;
                 self.tool = t;
+                if t == Tool::Comment {
+                    self.selection.clear();
+                }
             }
             A::Escape => {
+                if self.comment_draft.take().is_some() {
+                    self.revision += 1;
+                    return;
+                }
+                self.focused_comment = None;
                 if !matches!(self.gesture, Gesture::None) {
                     self.cancel_gesture();
                 } else if self.tool != Tool::Select {

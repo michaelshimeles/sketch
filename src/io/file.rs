@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub const FORMAT: &str = "sketch-rs";
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 4;
 pub const EXTENSION: &str = "sketch-rs";
 /// Documents saved before the rename from paper-rs. They open like `.sketch-rs` files.
 pub const OLD_EXTENSION: &str = "paper-rs";
@@ -22,6 +22,8 @@ struct FileV1 {
     format: String,
     version: u32,
     name: String,
+    id: String,
+    comments: Vec<crate::model::Comment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     camera: Option<Camera>,
     next_id: u64,
@@ -64,6 +66,8 @@ pub fn to_string(doc: &Document, camera: Option<&Camera>) -> String {
         format: FORMAT.into(),
         version: VERSION,
         name: doc.name.clone(),
+        id: "document".into(),
+        comments: doc.comments.clone(),
         camera: camera.copied(),
         next_id: doc.next_id,
         root: doc.root.clone(),
