@@ -84,8 +84,26 @@ pub(super) fn call(ed: &mut Editor, name: &str, a: &Args) -> ToolResult {
     }
     let id = a.req_str("commentId")?;
     let (page, i) = locate(ed, id)?;
+    if let Some(expected) = a.get("expectedUpdatedAt") {
+        let expected = expected
+            .as_u64()
+            .ok_or("expectedUpdatedAt must be an integer")?;
+        if ed.page_doc(page).comments[i].updated_at != expected {
+            return Err("comment changed since it was read; leave it open and reread it".into());
+        }
+    }
     match name {
         "get_comment" => {}
+        "reanchor_comment" => {
+            if a.get("expectedUpdatedAt").is_none() {
+                return Err("expectedUpdatedAt is required for anchor changes".into());
+            }
+            let (target_page, target) = resolve(ed, a.req_str("nodeId")?, page)?;
+            if target_page != page {
+                return Err("refresh anchors must stay on the original page".into());
+            }
+            ed.with_page(page, |ed| ed.reanchor_comment(id, target))?;
+        }
         "update_comment" => {
             let body = a.req_str("body")?;
             ed.with_page(page, |ed| ed.update_comment(id, body))?;

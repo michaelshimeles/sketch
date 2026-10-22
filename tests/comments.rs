@@ -286,3 +286,50 @@ fn fractional_bounds_comments_reopen_after_save() {
     let serialized = sketch_rs::project::format::page_to_json(&h.ed.page_data(0));
     sketch_rs::project::format::page_from_json(&serialized).unwrap();
 }
+
+#[test]
+fn refresh_reanchors_the_same_comment_without_rewriting_feedback() {
+    let mut h = host();
+    let old = target(&mut h);
+    let c = call(
+        &mut h,
+        "add_comment",
+        json!({"nodeId":old,"body":"My feedback","x":90,"y":85}),
+    );
+    let new = target(&mut h);
+    let r = call(
+        &mut h,
+        "reanchor_comment",
+        json!({"commentId":c["id"],"nodeId":new,"expectedUpdatedAt":c["updatedAt"]}),
+    );
+    assert_eq!(r["id"], c["id"]);
+    assert_eq!(r["body"], c["body"]);
+    assert_eq!(r["nodeId"], new);
+    assert_eq!(r["createdAt"], c["createdAt"]);
+    assert_eq!(r["status"], "open");
+    assert_eq!(r["position"], c["position"]);
+    call(
+        &mut h,
+        "update_comment",
+        json!({"commentId":c["id"],"body":"Edited while refreshing"}),
+    );
+    let now = call(&mut h, "get_comment", json!({"commentId":c["id"]}));
+    assert!(
+        exec::call(
+            &mut h,
+            "reanchor_comment",
+            &json!({"commentId":c["id"],"nodeId":old,"expectedUpdatedAt":0})
+        )
+        .is_err()
+    );
+    assert_eq!(
+        call(&mut h, "get_comment", json!({"commentId":c["id"]})),
+        now
+    );
+    call(&mut h, "undo", json!({}));
+    call(&mut h, "undo", json!({}));
+    assert_eq!(
+        call(&mut h, "get_comment", json!({"commentId":c["id"]}))["nodeId"],
+        old
+    );
+}

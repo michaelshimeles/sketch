@@ -117,7 +117,8 @@ local build; keep a backup before returning to an older release.
 Agents can collect a batch with `list_comments`, inspect targets with `get_comment`, make
 changes, verify them, then call `set_comment_status` to resolve completed feedback. Comments
 added during the batch can wait until the next run. This local feature has no accounts or
-remote synchronization.
+remote synchronization. Conditional writes accept `expectedUpdatedAt` to reject changed feedback.
+`reanchor_comment` requires that guard and preserves feedback while moving its pin within a page.
 
 ## AI agents (MCP)
 
@@ -178,7 +179,7 @@ written for Paper work here too.
 | Read | `get_basic_info`, `get_selection`, `get_node_info`, `get_children`, `get_tree_summary`, `get_computed_styles`, `get_jsx`, `find_nodes`, `get_fill_image`, `get_font_family_info`, `get_guide` |
 | See | `get_screenshot` (PNG image content of a node or the page), `export` (PNG/SVG/PDF files), `export_combined_pdf` |
 | Write | `create_artboard`, `write_html`, `update_styles`, `set_text_content`, `rename_nodes`, `duplicate_nodes`, `move_nodes`, `delete_nodes`, `finish_working_on_nodes` (saves) |
-| Comments | `list_comments`, `get_comment`, `add_comment`, `update_comment`, `delete_comment`, `set_comment_status` |
+| Comments | `list_comments`, `get_comment`, `add_comment`, `update_comment`, `delete_comment`, `set_comment_status`, `reanchor_comment` |
 | Sketch extras | `create_shape` (rectangles, ellipses, diamonds, stars, stickies, text, lines, arrows bound to shapes), `select_nodes`, `undo`, `redo` |
 
 `write_html` takes HTML with inline styles: flexbox (`display:flex`, direction, gap, padding,
@@ -379,3 +380,13 @@ AGENTS.md          workflow for coding agents; its skills live in .agents/skills
 MIT OR Apache-2.0 for the code in this repository. Inter (Regular, Medium, SemiBold) is
 © The Inter Project Authors under the SIL Open Font License 1.1; see `assets/fonts/OFL.txt`.
 The agent skills in `.agents/skills/` keep their own licenses; see `THIRD_PARTY.md`.
+
+### Source-bound design feedback
+
+The optional local workflow in `tools/design-sync/` connects a Sketch project to a working web application. It captures editable screens from a verified local preview, records the source commit and working-file hashes, preserves previous artboards, and transfers pins only when their source element matches confidently.
+
+The `sketch-design` skill supports refresh, batch review, and applying clear comments to isolated source edits. Verified changes publish against the unchanged starting source with exact file preimages retained. After refreshing the result, the agent can verify an intentionally changed element's replacement and resolve unchanged feedback. Concurrent source edits stop publishing; uncertain pins stay on their earlier references.
+
+See `tools/design-sync/SKILL.md` and `tools/design-sync/references/source-sync.md` for installation paths, bindings and the command workflow. This is an explicit local operation. It does not watch files continuously, deploy, or publish remotely.
+
+Run `node --test tools/design-sync/core.test.mjs` for the source and matching regressions. `node tools/design-sync/e2e.mjs` exercises the complete loop against a disposable source fixture and Sketch project, then restores the original open project. Its Playwright dependency path is local to this installation.

@@ -274,7 +274,9 @@ pub fn call(host: &mut dyn Host, name: &str, args: &Value) -> ToolResult {
                 "get_fill_image" => fill_image(ed, &a),
                 "find_nodes" => find_nodes(ed, &a),
                 "list_comments" | "get_comment" | "add_comment" | "update_comment"
-                | "delete_comment" | "set_comment_status" => comments::call(ed, name, &a),
+                | "delete_comment" | "set_comment_status" | "reanchor_comment" => {
+                    comments::call(ed, name, &a)
+                }
                 "export" => export(host, &a),
                 "export_combined_pdf" => export_pdf(host, &a),
                 "create_artboard" => create_artboard(ed, &a),
@@ -505,6 +507,7 @@ fn basic_info(host: &mut dyn Host, a: &Args) -> ToolResult {
         "artboards": artboards,
         "otherTopLevelLayers": others,
         "fontFamilies": ["Inter"],
+        "commentDraftPending": ed.comment_draft.is_some(),
         "selectionCount": if page == ed.active_page { ed.selection.len() } else { 0 },
         "nodeIdFormat": "\"<page>:<n>\", e.g. \"".to_string() + &node_key(ed, page, NodeId(1)) + "\"",
     }))

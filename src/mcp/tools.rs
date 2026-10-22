@@ -116,8 +116,15 @@ pub fn definitions() -> Vec<Value> {
         tool(
             "set_comment_status",
             "Resolve verified feedback or reopen it. Unfinished feedback stays open.",
-            json!({"commentId":{"type":"string"},"status":{"type":"string","enum":["open","resolved"]}}),
+            json!({"commentId":{"type":"string"},"status":{"type":"string","enum":["open","resolved"]},"expectedUpdatedAt":{"type":"integer"}}),
             &["commentId", "status"],
+            false,
+        ),
+        tool(
+            "reanchor_comment",
+            "Move an existing pin to a verified matching element on the same page after refresh. Preserves its ID, feedback, status, creation time and relative pin position. Rejects concurrent comment edits and pending drafts; undo restores the old anchor.",
+            json!({"commentId":{"type":"string"},"nodeId":node_id("Verified new element on the original page"),"expectedUpdatedAt":{"type":"integer"}}),
+            &["commentId", "nodeId", "expectedUpdatedAt"],
             false,
         ),
         // ------------------------------------------------------------ projects and pages

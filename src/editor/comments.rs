@@ -54,7 +54,7 @@ impl Editor {
         self.edit("Edit comment", |tx| {
             let c = &mut tx.comments_mut()[i];
             c.body = text;
-            c.updated_at = now_ms();
+            c.updated_at = now_ms().max(c.updated_at.saturating_add(1));
         });
         Ok(())
     }
@@ -63,7 +63,28 @@ impl Editor {
         self.edit("Comment status", |tx| {
             let c = &mut tx.comments_mut()[i];
             c.resolved = resolved;
-            c.updated_at = now_ms();
+            c.updated_at = now_ms().max(c.updated_at.saturating_add(1));
+        });
+        Ok(())
+    }
+    pub fn reanchor_comment(&mut self, id: &str, target: NodeId) -> Result<(), String> {
+        if self.comment_draft.is_some() {
+            return Err("Post or cancel your comment before refreshing".into());
+        }
+        let i = self.comment_index(id)?;
+        let n = self
+            .doc
+            .get(target)
+            .ok_or("comment target does not exist")?;
+        let name = n.name.clone();
+        let r = self.doc.world_rect(target).unwrap();
+        let relative = self.doc.comments[i].relative;
+        self.edit("Refresh comment anchor", |tx| {
+            let c = &mut tx.comments_mut()[i];
+            c.target = target;
+            c.target_name = name;
+            c.fallback = v2(r.x + r.w * relative.x, r.y + r.h * relative.y);
+            c.updated_at = now_ms().max(c.updated_at.saturating_add(1));
         });
         Ok(())
     }
