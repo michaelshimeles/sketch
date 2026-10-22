@@ -295,9 +295,12 @@ mod tests {
     #[test]
     fn legacy_v1_file_migrates_to_page() {
         let ed = demo::showcase();
-        let legacy = crate::io::file::to_string(&ed.doc, None);
-        assert!(legacy.contains("\"version\": 1"));
-        let p = page_from_json(&legacy).unwrap();
+        let mut legacy: Value =
+            serde_json::from_str(&crate::io::file::to_string(&ed.doc, None)).unwrap();
+        legacy["version"] = json!(1);
+        legacy.as_object_mut().unwrap().remove("id");
+        legacy.as_object_mut().unwrap().remove("comments");
+        let p = page_from_json(&legacy.to_string()).unwrap();
         assert_eq!(p.doc.nodes, ed.doc.nodes);
         assert_eq!(p.name, ed.doc.name);
         assert_eq!(p.id.len(), 16);

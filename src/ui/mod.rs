@@ -218,15 +218,14 @@ fn top_bar(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) {
         )
         .on_hover_text("Comments (C)")
         .clicked()
+            && ed.comment_draft.is_none()
         {
-            if ed.comment_draft.is_none() {
-                st.comments.open = !st.comments.open;
-                ed.run(Action::Tool(if st.comments.open {
-                    Tool::Comment
-                } else {
-                    Tool::Select
-                }));
-            }
+            st.comments.open = !st.comments.open;
+            ed.run(Action::Tool(if st.comments.open {
+                Tool::Comment
+            } else {
+                Tool::Select
+            }));
         }
         ui.add_space(4.0);
         let title = if st.project_name.is_empty() {

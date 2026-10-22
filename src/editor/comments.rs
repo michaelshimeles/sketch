@@ -19,7 +19,7 @@ impl Editor {
             .get(target)
             .ok_or("comment target does not exist")?;
         let r = self.doc.world_rect(target).unwrap();
-        if !at.x.is_finite() || !at.y.is_finite() || !r.inflate(0.001).contains(at) {
+        if !at.x.is_finite() || !at.y.is_finite() || !r.contains(at) {
             return Err("comment point must be inside the target's bounds".into());
         }
         let id = new_id();
@@ -27,8 +27,16 @@ impl Editor {
             id: id.clone(),
             target,
             relative: v2(
-                if r.w > 0.0 { (at.x - r.x) / r.w } else { 0.5 },
-                if r.h > 0.0 { (at.y - r.y) / r.h } else { 0.5 },
+                if r.w > 0.0 {
+                    ((at.x - r.x) / r.w).clamp(0.0, 1.0)
+                } else {
+                    0.5
+                },
+                if r.h > 0.0 {
+                    ((at.y - r.y) / r.h).clamp(0.0, 1.0)
+                } else {
+                    0.5
+                },
             ),
             fallback: at,
             target_name: n.name.clone(),
@@ -135,7 +143,7 @@ impl Editor {
                 });
                 self.camera.fit(&r.inflate(80.0), self.viewport, 60.0, 1.0);
             }
-            self.tool = super::Tool::Comment;
+            self.run(super::shortcuts::Action::Tool(super::Tool::Comment));
             self.revision += 1;
         }
     }

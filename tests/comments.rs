@@ -226,3 +226,63 @@ fn comments_have_versioned_storage_and_legacy_export_keeps_metadata() {
     assert!(v["version"].as_u64().unwrap() > 3);
     assert_eq!(v["comments"][0]["body"], "Persist me");
 }
+
+#[test]
+fn near_edge_comments_cannot_create_unreadable_saved_pages() {
+    let mut h = host();
+    let n = target(&mut h);
+    assert!(
+        exec::call(
+            &mut h,
+            "add_comment",
+            &json!({"nodeId":n,"body":"Edge","x":39.9995,"y":85})
+        )
+        .is_err()
+    );
+    assert_eq!(call(&mut h, "list_comments", json!({}))["total"], 0);
+}
+#[test]
+fn opening_a_comment_ends_canvas_text_editing() {
+    let mut h = host();
+    let n = call(
+        &mut h,
+        "write_html",
+        json!({"targetNodeId":"root","mode":"insert-children","html":"<p>Hello</p>"}),
+    )["createdNodeIds"][0]
+        .clone();
+    let c = call(
+        &mut h,
+        "add_comment",
+        json!({"nodeId":n,"body":"Text feedback"}),
+    );
+    let id = sketch_rs::model::NodeId(
+        n.as_str()
+            .unwrap()
+            .rsplit(':')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap(),
+    );
+    h.ed.start_text_edit(id, None);
+    assert!(h.ed.text_edit.is_some());
+    h.ed.focus_comment(c["id"].as_str().unwrap());
+    assert!(h.ed.text_edit.is_none());
+}
+
+#[test]
+fn fractional_bounds_comments_reopen_after_save() {
+    let mut h = host();
+    let node = call(
+        &mut h,
+        "create_artboard",
+        json!({"name":"Fractional card","styles":{"left":200,"top":200,"width":100.1,"height":100.1}}),
+    )["id"].clone();
+    call(
+        &mut h,
+        "add_comment",
+        json!({"nodeId":node,"body":"At the corner","x":300.1,"y":300.1}),
+    );
+    let serialized = sketch_rs::project::format::page_to_json(&h.ed.page_data(0));
+    sketch_rs::project::format::page_from_json(&serialized).unwrap();
+}

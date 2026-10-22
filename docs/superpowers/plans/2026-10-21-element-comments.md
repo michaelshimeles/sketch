@@ -32,10 +32,10 @@ Files: create `src/model/comment.rs`, `src/editor/comments.rs`, `tests/comments.
 
 Interfaces: `Comment` stores ID, target NodeId, relative V2, fallback V2, target label, body, timestamps, resolved flag. `Editor::add_comment(target, point, body) -> Result<String,String>`, `update_comment(id, body)`, `resolve_comment(id, bool)`, `delete_comment(id)`; mutations use `Tx::comments_mut()`. `Comment::position(&Document) -> V2` follows live bounds. MCP exposes `list_comments`, `get_comment`, `add_comment`, `update_comment`, `delete_comment`, `set_comment_status` with full target context.
 
-- [ ] Add integration tests that call the absent comment MCP tools and assert anchor movement, missing targets and undo, persisted status/body, cross-page pagination and clone independence, rejection of malformed inputs, and exclusion from SVG.
-- [ ] Run `cargo +1.96.1 test --test comments` and record the expected unknown-tool failure.
-- [ ] Implement the above model and shared editor operations. Add page format v4 with comments and migration from v3. Preserve comments in legacy save paths and page duplication with new IDs.
-- [ ] Run `cargo +1.96.1 test --test comments`, expected all pass. Commit this deliverable.
+- [x] Add integration tests that call the absent comment MCP tools and assert anchor movement, missing targets and undo, persisted status/body, cross-page pagination and clone independence, rejection of malformed inputs, and exclusion from SVG.
+- [x] Run `cargo +1.96.1 test --test comments` and record the expected unknown-tool failure.
+- [x] Implement the above model and shared editor operations. Add page format v4 with comments and migration from v3. Preserve comments in legacy save paths and page duplication with new IDs.
+- [x] Run `cargo +1.96.1 test --test comments`, expected all pass. Commit this deliverable.
 
 ### Task 2: Native cursor, composer, pins, and review panel
 
@@ -43,15 +43,23 @@ Files: modify editor input/tool/shortcuts, app input handling if necessary, them
 
 Interfaces: `Tool::Comment` uses C; editor stores pending anchor and focused comment; UI stores draft text/target and filter. `comments::panel` and `comments::overlay` consume the existing editor and canvas rect.
 
-- [ ] Add scenario tests for C, locked/hidden/clipped target hit testing, no node motion, preserving a pending target on another click, and Escape behavior. Run tests and capture failure.
-- [ ] Add the tool and hover highlighting; click creates a pending element anchor, not a design node. Add ancestor selection, Post/Cancel with Command+Enter/Escape, editable comment details, open/resolved list and numbered pins. Navigation retains drafts and prevents implicit switching.
-- [ ] Test movement/resizing and pan/zoom in the native app, including canceled/empty drafts. Run `cargo +1.96.1 test --test comments` and appropriate workflow tests. Commit this deliverable.
+- [x] Add scenario tests for C, locked/hidden/clipped target hit testing, no node motion, preserving a pending target on another click, and Escape behavior. Run tests and capture failure.
+- [x] Add the tool and hover highlighting; click creates a pending element anchor, not a design node. Add ancestor selection, Post/Cancel with Command+Enter/Escape, editable comment details, open/resolved list and numbered pins. Navigation retains drafts and prevents implicit switching.
+- [x] Test movement/resizing and pan/zoom in the native app, including canceled/empty drafts. Run `cargo +1.96.1 test --test comments` and appropriate workflow tests. Commit this deliverable.
 
 ### Task 3: Verify, install, and connect the generic skill
 
 Files: update README and local `/sketch-design` skill; add ignored proof artifacts and local build packaging under Documents/Sketch-design.
 
-- [ ] Run `cargo +1.96.1 fmt --check`, `cargo +1.96.1 clippy --all-targets -- -D warnings`, `cargo +1.96.1 test`, and `git diff --check`. Expected all pass; record any genuine environment limitations.
-- [ ] Review the full branch with a fresh reviewer. Address findings and repeat affected checks.
-- [ ] Back up the app and AEGIS project, install the custom app without Sparkle updates, and reopen the same project. Check UI interactions and MCP from an independent client; capture native screenshots. Remove only test-created comments.
-- [ ] Update `/sketch-design` with the real comment tool schemas and instructions, package/validate it, and document the user flow. Commit source and retain the worktree for local maintenance.
+- [x] Run `cargo +1.96.1 fmt --check`, `cargo +1.96.1 clippy --all-targets -- -D warnings`, `cargo +1.96.1 test`, and `git diff --check`. Expected all pass; record any genuine environment limitations.
+- [x] Review the full branch with a fresh reviewer. Address findings and repeat affected checks.
+- [x] Back up the app and AEGIS project, install the custom app without Sparkle updates, and reopen the same project. Check UI interactions and MCP from an independent client; capture native screenshots. Remove only test-created comments.
+- [x] Update `/sketch-design` with the real comment tool schemas and instructions, package/validate it, and document the user flow. Commit source and retain the worktree for local maintenance.
+
+## Verification record
+
+Native checks covered creating a comment on a heading, typing feedback, posting it, resolving it, showing resolved items, reopening it, and reopening the project in the installed build. Anchor movement/resizing, deletion and undo, persistence, pagination, duplication, validation, and shortcut safety are covered by integration tests.
+
+The full suite passed. Its optional PDF raster preview process hung in macOS's dynamic loader before running and was stopped; the existing test treats an unavailable rasterizer as optional. PDF generation tests still passed. Final focused tests passed 9/9 after fixing fractional-edge rounding. Formatting, all-target Clippy with warnings denied, build, and whitespace checks passed. Fresh review found no remaining actionable items after fixes.
+
+Installed at `/Users/blie/Applications/Sketch.app`, sharing `127.0.0.1:29980` with Claude Code and Codex. Preserved both user comments from the test copy, removed only two agent test comments, and confirmed all design nodes stayed unchanged. Original app and pre-install project backups remain under `/Users/blie/Documents/Sketch-design`. The generic skill is installed for both agents and its package validates.

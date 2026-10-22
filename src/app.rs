@@ -123,6 +123,10 @@ impl App {
 
     /// Before leaving a scratch (project-less) document. Projects autosave, so they never ask.
     fn confirm_discard(&mut self) -> bool {
+        if self.ed.comment_draft.is_some() {
+            self.ed.status = "Post or cancel your comment before opening another document".into();
+            return false;
+        }
         if self.session.project.is_some() || self.st.home.is_some() || !self.ed.is_dirty() {
             return true;
         }

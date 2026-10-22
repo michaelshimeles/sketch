@@ -82,26 +82,27 @@ fn ten_thousand_elements_cache_and_pan_without_rework() {
     let mut r = CanvasRenderer::new(&g.device, OFFSCREEN_FORMAT);
     let tex = g.target([800, 500]);
     let view = tex.create_view(&Default::default());
-    let mut draw = |e: &Editor, cache: &mut SceneCache| {
-        let f = scene::canvas(e, cache, V2::ZERO, true);
-        let mut enc = g.device.create_command_encoder(&Default::default());
-        r.render(
-            &g.device,
-            &g.queue,
-            &mut enc,
-            &view,
-            [800, 500],
-            1.0,
-            &f,
-            [1.0; 4],
-        );
-        g.queue.submit([enc.finish()]);
-    };
-    draw(&e, &mut cache);
-    for i in 0..5 {
-        e.camera.pan = e.camera.pan + v2(3.0 * i as f64, 1.0);
+    {
+        let mut draw = |e: &Editor, cache: &mut SceneCache| {
+            let f = scene::canvas(e, cache, V2::ZERO, true);
+            let mut enc = g.device.create_command_encoder(&Default::default());
+            r.render(
+                &g.device,
+                &g.queue,
+                &mut enc,
+                &view,
+                [800, 500],
+                1.0,
+                &f,
+                [1.0; 4],
+            );
+            g.queue.submit([enc.finish()]);
+        };
         draw(&e, &mut cache);
+        for i in 0..5 {
+            e.camera.pan = e.camera.pan + v2(3.0 * i as f64, 1.0);
+            draw(&e, &mut cache);
+        }
     }
-    drop(draw);
     assert_eq!(r.uploads, 1, "panning reuses the uploaded geometry");
 }

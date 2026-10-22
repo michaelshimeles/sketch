@@ -81,14 +81,13 @@ pub fn panel(ui: &mut egui::Ui, ed: &mut Editor, st: &mut CommentsUi) {
                                     if ui
                                         .small_button(if c.resolved { "Reopen" } else { "Resolve" })
                                         .clicked()
-                                    {
-                                        if let Some(p) = (0..ed.pages.len()).find(|p| {
+                                        && let Some(p) = (0..ed.pages.len()).find(|p| {
                                             ed.page_doc(*p).comments.iter().any(|x| x.id == c.id)
-                                        }) {
-                                            let _ = ed.with_page(p, |ed| {
-                                                ed.resolve_comment(&c.id, !c.resolved)
-                                            });
-                                        }
+                                        })
+                                    {
+                                        let _ = ed.with_page(p, |ed| {
+                                            ed.resolve_comment(&c.id, !c.resolved)
+                                        });
                                     }
                                     if target_name.is_some() && ui.small_button("Edit").clicked() {
                                         ed.focus_comment(&c.id);
@@ -100,12 +99,12 @@ pub fn panel(ui: &mut egui::Ui, ed: &mut Editor, st: &mut CommentsUi) {
                                             focus: true,
                                         });
                                     }
-                                    if ui.small_button("Delete").clicked() {
-                                        if let Some(p) = (0..ed.pages.len()).find(|p| {
+                                    if ui.small_button("Delete").clicked()
+                                        && let Some(p) = (0..ed.pages.len()).find(|p| {
                                             ed.page_doc(*p).comments.iter().any(|x| x.id == c.id)
-                                        }) {
-                                            let _ = ed.with_page(p, |ed| ed.delete_comment(&c.id));
-                                        }
+                                        })
+                                    {
+                                        let _ = ed.with_page(p, |ed| ed.delete_comment(&c.id));
                                     }
                                 });
                             });
@@ -182,6 +181,7 @@ pub fn overlay(ctx: &egui::Context, ed: &mut Editor, st: &mut CommentsUi, canvas
         }
         egui::Area::new(egui::Id::new(("comment-pin", &id)))
             .order(egui::Order::Foreground)
+            .fade_in(false)
             .fixed_pos(pos - egui::vec2(12.0, 12.0))
             .show(ctx, |ui| {
                 let (r, response) =
@@ -227,6 +227,8 @@ pub fn overlay(ctx: &egui::Context, ed: &mut Editor, st: &mut CommentsUi, canvas
     let mut target_change = None;
     egui::Area::new("comment-composer".into())
         .order(egui::Order::Foreground)
+        .fade_in(false)
+        .default_size(egui::vec2(322.0, 240.0))
         .fixed_pos(pos)
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style())
@@ -267,7 +269,7 @@ pub fn overlay(ctx: &egui::Context, ed: &mut Editor, st: &mut CommentsUi, canvas
                             .desired_rows(4)
                             .desired_width(f32::INFINITY),
                     );
-                    if d.focus {
+                    if d.focus && ui.is_visible() {
                         response.request_focus();
                         d.focus = false;
                     }
