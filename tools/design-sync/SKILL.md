@@ -7,7 +7,7 @@ description: Use the local open-source Sketch app to design screens or review ba
 
 Work in the open local Sketch project. Claude Code and Codex share `http://127.0.0.1:29980/mcp`; keep `/Users/blie/Applications/Sketch.app` running. Use separate workspaces for parallel design work. Use one writer at a time for source refresh and apply.
 
-Read `get_guide({topic:"sketch-rs-mcp-instructions"})`, `get_basic_info`, and `get_selection`. Retain the project's path and page IDs. Pass `fileId` as the exact project path on MCP reads and writes, so switching projects stops work. A pending comment draft must be posted or canceled before refresh.
+Read `get_guide({topic:"sketch-rs-mcp-instructions"})`. Without `workspaceId`, `get_basic_info` and `get_selection` describe the visible project. Retain the project path and page IDs. Use its exact `fileId` for visible-project reads and writes. For workspace calls, follow the routing instructions below and use the workspace's own IDs. A pending comment draft must be posted or canceled before refresh.
 
 ## Parallel design work
 
