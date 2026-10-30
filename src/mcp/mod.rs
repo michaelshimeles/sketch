@@ -15,6 +15,7 @@ pub mod exec;
 pub mod html;
 pub mod server;
 pub mod tools;
+pub mod workspaces;
 
 /// Paper uses 29979; Sketch listens next door so both apps can run side by side.
 pub const DEFAULT_PORT: u16 = 29_980;

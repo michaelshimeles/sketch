@@ -30,6 +30,7 @@ use std::sync::{Mutex, OnceLock};
 /// What a tool call needs from its surroundings.
 pub trait Host {
     fn editor(&mut self) -> &mut Editor;
+    fn workspaces(&mut self) -> &mut super::workspaces::Workspaces;
     fn store(&self) -> &Store;
     /// The project shown in the app (None for a scratch document or the home screen).
     fn project(&self) -> Option<&Project>;
@@ -48,6 +49,7 @@ pub trait Host {
 pub struct SessionHost {
     pub ed: Editor,
     pub session: Session,
+    pub workspaces: super::workspaces::Workspaces,
     gpu: Option<Headless>,
     gpu_tried: bool,
 }
@@ -57,6 +59,7 @@ impl SessionHost {
         SessionHost {
             ed: Editor::default(),
             session: Session::new(store),
+            workspaces: Default::default(),
             gpu: None,
             gpu_tried: false,
         }
@@ -64,6 +67,9 @@ impl SessionHost {
 }
 
 impl Host for SessionHost {
+    fn workspaces(&mut self) -> &mut super::workspaces::Workspaces {
+        &mut self.workspaces
+    }
     fn editor(&mut self) -> &mut Editor {
         &mut self.ed
     }
@@ -77,14 +83,7 @@ impl Host for SessionHost {
         true
     }
     fn open_project(&mut self, dir: &Path) -> Result<(), String> {
-        if self.session.project.is_some() {
-            self.session
-                .save_all(&mut self.ed)
-                .map_err(|e| e.to_string())?;
-        }
-        self.session
-            .open(&mut self.ed, dir)
-            .map_err(|e| format!("{}: {e}", dir.display()))
+        self.workspaces.open(&mut self.ed, &mut self.session, dir)
     }
     fn save(&mut self) -> Result<(), String> {
         if self.session.project.is_some() {
@@ -246,6 +245,18 @@ fn resolve_all(
 
 /// Run one tool. Errors are returned as messages for the agent.
 pub fn call(host: &mut dyn Host, name: &str, args: &Value) -> ToolResult {
+    if args.get("workspaceId").is_some() {
+        return super::workspaces::route(host, name, args);
+    }
+    match name {
+        "create_workspace" => super::workspaces::create(host, args),
+        "list_workspaces" => super::workspaces::list(host, args),
+        "import_workspace_pages" => super::workspaces::import_pages(host, args),
+        _ => call_document(host, name, args),
+    }
+}
+
+pub(super) fn call_document(host: &mut dyn Host, name: &str, args: &Value) -> ToolResult {
     let empty = Map::new();
     let a = Args(args.as_object().unwrap_or(&empty));
     match name {
@@ -306,7 +317,7 @@ pub fn call(host: &mut dyn Host, name: &str, args: &Value) -> ToolResult {
 }
 
 /// Projects match by manifest id, name or folder path.
-fn find_project(store: &Store, key: &str) -> Result<PathBuf, String> {
+pub(super) fn find_project(store: &Store, key: &str) -> Result<PathBuf, String> {
     let key = key.trim().trim_start_matches("/file/");
     let p = Path::new(key);
     if p.is_absolute() && p.join(crate::project::MANIFEST).is_file() {

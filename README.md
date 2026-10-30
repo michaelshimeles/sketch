@@ -338,8 +338,8 @@ Known gaps), ⏳ planned in a later milestone, ❌ not planned.
 * **Import**: Excalidraw rotation is baked into paths (text rotation is dropped), bound text
   inside shapes stays a separate text layer (except sticky notes), and fonts map to Inter.
   SVG patterns, filters, masks and clip paths are not imported.
-* **MCP**: one project is open at a time, so `fileId` must name the open project (call
-  `open_file` to switch; the user's window switches too). No design tokens or AI
+* **MCP**: without `workspaceId`, `fileId` must name the visible project. Agent workspaces
+  route calls to independent documents without switching the window. No design tokens or AI
   image generation (Paper has them). Moving or duplicating layers between pages isn't
   supported. Remote `http(s)` images aren't fetched; pass a local path or a `data:` URI.
   CSS margin, grid, shadows and transforms are reported back as ignored styles.
@@ -390,3 +390,35 @@ The `sketch-design` skill supports refresh, batch review, and applying clear com
 See `tools/design-sync/SKILL.md` and `tools/design-sync/references/source-sync.md` for installation paths, bindings and the command workflow. This is an explicit local operation. It does not watch files continuously, deploy, or publish remotely.
 
 Run `node --test tools/design-sync/core.test.mjs` for the source and matching regressions. `node tools/design-sync/e2e.mjs` exercises the complete loop against a disposable source fixture and Sketch project, then restores the original open project. Its Playwright dependency path is local to this installation.
+
+
+## Parallel agent workspaces
+
+Create an independent design for each task with `create_workspace({fileId, name})`.
+Pass the returned `workspaceId` on every document read and edit. Do not call `open_file`
+to prepare background work. Calls without a workspace ID retain the existing visible-project
+behavior. An unknown or malformed workspace ID returns an error and never edits the visible
+project. If both IDs are supplied, `fileId` must identify the workspace, not its source.
+
+Workspaces include the source project's pages, images and comments. Forking the visible
+project saves its pending edits first. Each workspace has independent selection, camera,
+page histories and saved files. Completed workspace calls save immediately. Documents
+survive an app restart; undo histories, as for ordinary projects, last for the app session.
+`list_workspaces({fileId})` finds a project's workspaces after reconnecting.
+
+In the home screen's project menu, choose **New workspace** to create a copy without
+opening it. Workspace names include their source project. Open one to inspect or edit it;
+switching away retains its session and undo history for background calls. The MCP tools
+and window use the same editor whenever that workspace is visible.
+
+After reviewing a result, open the destination project and call
+`import_workspace_pages({fileId, sourceWorkspaceId, pageIds})`. It copies selected pages
+with new page and comment IDs, keeps their image assets, and preserves the destination's
+existing pages, selection and undo history. Imported pages can be deleted through the
+normal page controls. This is an additive import, not an automatic element merge.
+
+Agent requests share the app's event queue. They can interleave safely across separate
+workspaces; individual document operations run in order. Assign one workspace per worker
+if their undo histories must remain independent. This local feature does not add remote
+accounts, permissions, synchronization or cross-process file locking. Do not open the same
+workspace folder in two Sketch processes.

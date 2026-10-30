@@ -5,9 +5,25 @@ description: Use the local open-source Sketch app to design screens or review ba
 
 # Sketch design
 
-Work in the open local Sketch project. Claude Code and Codex share `http://127.0.0.1:29980/mcp`; keep `/Users/blie/Applications/Sketch.app` running and use one writer at a time.
+Work in the open local Sketch project. Claude Code and Codex share `http://127.0.0.1:29980/mcp`; keep `/Users/blie/Applications/Sketch.app` running. Use separate workspaces for parallel design work. Use one writer at a time for source refresh and apply.
 
 Read `get_guide({topic:"sketch-rs-mcp-instructions"})`, `get_basic_info`, and `get_selection`. Retain the project's path and page IDs. Pass `fileId` as the exact project path on MCP reads and writes, so switching projects stops work. A pending comment draft must be posted or canceled before refresh.
+
+## Parallel design work
+
+For separate agent tasks, call `create_workspace({fileId, name})` once per worker.
+Keep the returned `workspaceId` and pass it on every document read, edit, screenshot,
+comment and undo call. Omit the source project's `fileId`, or use the workspace's own
+`fileId`. Do not call `open_file` to prepare background work. That command changes the
+user's window and is only for inspection. Use `list_workspaces` to reconnect after a
+restart. Each workspace has its own saved document and undo history.
+
+Review screenshots, then use `import_workspace_pages({fileId, sourceWorkspaceId, pageIds})`
+with the destination project open. Imports add new pages and preserve existing ones.
+They do not merge element edits. Do not import results without the user's instruction.
+The source-sync CLI below still uses the visible source-bound project. Do not run its
+refresh or apply operations concurrently against the same project or assume a workspace
+inherits its source binding.
 
 ## Commands
 

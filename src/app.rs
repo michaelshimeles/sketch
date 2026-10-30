@@ -34,6 +34,7 @@ pub struct App {
     gfx: Option<Gfx>,
     pub ed: Editor,
     session: Session,
+    workspaces: crate::mcp::workspaces::Workspaces,
     st: UiState,
     ctx: egui::Context,
     start: Instant,
@@ -80,6 +81,7 @@ impl App {
             gfx: None,
             ed: Editor::default(),
             session: Session::new(store),
+            workspaces: Default::default(),
             st: UiState::default(),
             ctx,
             start: Instant::now(),
@@ -236,7 +238,7 @@ impl App {
         if self.session.project.is_some() {
             self.save_project(true);
         }
-        match self.session.open(&mut self.ed, dir) {
+        match self.workspaces.open(&mut self.ed, &mut self.session, dir) {
             Ok(()) => {
                 self.st.home = None;
                 self.st.project_name = self.session.project_name();
@@ -248,15 +250,8 @@ impl App {
     }
 
     fn new_project(&mut self) {
-        if self.session.project.is_some() {
-            self.save_project(true);
-        }
-        match self.session.create(&mut self.ed, "Untitled") {
-            Ok(()) => {
-                self.st.home = None;
-                self.st.project_name = self.session.project_name();
-                self.st.save_state.clear();
-            }
+        match self.session.store.create("Untitled") {
+            Ok((project, _)) => self.open_project(&project.dir),
             Err(e) => self.error(format!("Could not create a project: {e}")),
         }
     }
@@ -264,8 +259,9 @@ impl App {
     fn go_home(&mut self) {
         if self.session.project.is_some() {
             self.save_project(true);
-            if let Err(e) = self.session.close(&mut self.ed) {
+            if let Err(e) = self.workspaces.leave(&mut self.ed, &mut self.session) {
                 self.error(format!("Could not save project: {e}"));
+                return;
             }
         } else if !self.confirm_discard() {
             return;
@@ -332,6 +328,13 @@ impl App {
                     .rename(&dir, &name)
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
+                HomeAction::CreateWorkspace(dir) => crate::mcp::workspaces::create(
+                    self,
+                    &serde_json::json!({
+                        "fileId":dir,"name":"Workspace"
+                    }),
+                )
+                .map(|_| ()),
                 HomeAction::Duplicate(dir) => {
                     store.duplicate(&dir).map(|_| ()).map_err(|e| e.to_string())
                 }
@@ -1350,6 +1353,9 @@ impl App {
             let _ = c.reply.send(r);
         }
         self.st.project_name = self.session.project_name();
+        if let Some(home) = &mut self.st.home {
+            home.refresh(&self.session.store, crate::project::now_ms());
+        }
         self.ed.revision += 1;
         if let Some(g) = &self.gfx {
             g.window.request_redraw();
@@ -1358,6 +1364,9 @@ impl App {
 }
 
 impl crate::mcp::exec::Host for App {
+    fn workspaces(&mut self) -> &mut crate::mcp::workspaces::Workspaces {
+        &mut self.workspaces
+    }
     fn editor(&mut self) -> &mut Editor {
         &mut self.ed
     }
@@ -1374,15 +1383,7 @@ impl crate::mcp::exec::Host for App {
         self.st.home.is_none()
     }
     fn open_project(&mut self, dir: &std::path::Path) -> Result<(), String> {
-        // No modal dialogs here: the agent gets the error instead.
-        if self.session.project.is_some() {
-            self.session
-                .save_all(&mut self.ed)
-                .map_err(|e| format!("could not save the open project: {e}"))?;
-        }
-        self.session
-            .open(&mut self.ed, dir)
-            .map_err(|e| format!("could not open {}: {e}", dir.display()))?;
+        self.workspaces.open(&mut self.ed, &mut self.session, dir)?;
         self.st.home = None;
         self.st.project_name = self.session.project_name();
         self.st.save_state.clear();

@@ -14,6 +14,7 @@ pub enum HomeAction {
     Open(PathBuf),
     Rename(PathBuf, String),
     Duplicate(PathBuf),
+    CreateWorkspace(PathBuf),
     Trash(PathBuf),
     Restore(PathBuf),
     DeleteForever(PathBuf),
@@ -32,6 +33,7 @@ pub struct HomeView {
     pub now_ms: u64,
     pub root: PathBuf,
     thumbs: HashMap<PathBuf, (Option<SystemTime>, egui::TextureHandle)>,
+    workspaces: HashMap<PathBuf, String>,
 }
 
 const CARD_W: f32 = 232.0;
@@ -42,6 +44,14 @@ impl HomeView {
     pub fn refresh(&mut self, store: &crate::project::Store, now_ms: u64) {
         self.root = store.root.clone();
         self.entries = store.list();
+        self.workspaces = self
+            .entries
+            .iter()
+            .filter_map(|entry| {
+                crate::mcp::workspaces::metadata(&entry.dir)
+                    .map(|meta| (entry.dir.clone(), meta.name))
+            })
+            .collect();
         self.trash = store.list_trash();
         self.now_ms = now_ms;
     }
@@ -380,6 +390,13 @@ fn project_card(ui: &mut Ui, hv: &mut HomeView, e: &Entry) {
                 });
             });
         }
+        if hv.workspaces.contains_key(&e.dir) {
+            ui.label(
+                RichText::new("Workspace")
+                    .size(theme::SECONDARY)
+                    .color(p.secondary),
+            );
+        }
         let pages = e.manifest.pages.len();
         ui.label(
             RichText::new(format!(
@@ -401,6 +418,10 @@ fn card_menu(ui: &mut Ui, hv: &mut HomeView, e: &Entry) {
     }
     if ui.button("Rename").clicked() {
         hv.renaming = Some((e.dir.clone(), e.manifest.name.clone()));
+        ui.close();
+    }
+    if ui.button("New workspace").clicked() {
+        hv.actions.push(HomeAction::CreateWorkspace(e.dir.clone()));
         ui.close();
     }
     if ui.button("Duplicate").clicked() {

@@ -24,6 +24,11 @@ delete_nodes. Whiteboard shapes, sticky notes and arrows: create_shape. Hand-dra
 update_styles with {\"sketch\": true, \"roughness\": 1, \"fillStyle\": \"hachure\"}.
 - Check your work with get_screenshot. Artboard height is a starting point: when content \
 clips set height: \"fit-content\" with update_styles.
+- For parallel agents, create_workspace with fileId and a task name, then pass its workspaceId \
+ on every document call. Each workspace has its own saved design and undo history. \
+ list_workspaces finds them after a reconnect. Background work never switches the window. \
+ open_file is only for showing a project or workspace to the user. \
+ import_workspace_pages copies chosen pages into the open destination as new pages.
 - Call finish_working_on_nodes when done.";
 
 fn file_id() -> Value {
@@ -49,10 +54,30 @@ fn tool(name: &str, desc: &str, props: Value, required: &[&str], read_only: bool
         && !m.contains_key("fileId")
         && !matches!(
             name,
-            "list_resources" | "create_file" | "get_font_family_info" | "get_guide" | "open_file"
+            "list_resources"
+                | "create_file"
+                | "get_font_family_info"
+                | "get_guide"
+                | "open_file"
+                | "list_workspaces"
         )
     {
         m.insert("fileId".into(), file_id());
+    }
+    if !matches!(
+        name,
+        "list_resources"
+            | "create_file"
+            | "open_file"
+            | "get_font_family_info"
+            | "get_guide"
+            | "create_workspace"
+            | "list_workspaces"
+            | "import_workspace_pages"
+    ) && let Some(m) = props.as_object_mut()
+    {
+        m.insert("workspaceId".into(), json!({"type":"string","minLength":1,
+            "description":"Explicit agent workspace from create_workspace or list_workspaces. Does not switch the user's project. Never defaults to another workspace."}));
     }
     let ann = if read_only {
         json!({"readOnlyHint": true})
@@ -78,6 +103,28 @@ pub fn definitions() -> Vec<Value> {
     let node_id = |d: &str| json!({"type": "string", "description": d});
     let ids = |d: &str| json!({"type": "array", "items": {"type": "string"}, "description": d});
     vec![
+        tool(
+            "create_workspace",
+            "Fork a saved project into a named independent workspace without switching the user's view. Includes current unsaved edits when the source is visible. Returns workspaceId for all subsequent document calls.",
+            json!({"fileId":file_id(),"name":{"type":"string","minLength":1}}),
+            &["fileId", "name"],
+            false,
+        ),
+        tool(
+            "list_workspaces",
+            "List persistent agent workspaces, optionally filtered by their source project's fileId.",
+            json!({"fileId":file_id()}),
+            &[],
+            true,
+        ),
+        tool(
+            "import_workspace_pages",
+            "Copy selected pages from a workspace into the open destination project as new pages. Preserves existing pages and the user's view. Does not merge or overwrite existing elements.",
+            json!({"fileId":file_id(),"sourceWorkspaceId":{"type":"string","minLength":1},
+                "pageIds":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string"}}}),
+            &["fileId", "sourceWorkspaceId", "pageIds"],
+            false,
+        ),
         tool(
             "list_comments",
             "List element-pinned comments across the open project, with target context. Defaults to open; paginate using total, offset and limit.",
@@ -514,6 +561,12 @@ pub fn definitions() -> Vec<Value> {
 
 pub const GUIDE_INSTRUCTIONS: &str = "\
 # Designing in Sketch over MCP
+
+Parallel work: create_workspace({fileId, name}) forks a project without switching the window.
+Pass workspaceId on every subsequent document call, including reads, screenshots and undo.
+Use a different workspace per agent. list_workspaces finds persistent workspaces after restart.
+open_file is only for showing a project or workspace to the user. import_workspace_pages
+copies selected pages into the visible destination as new pages, without overwriting it.
 
 Comments: list_comments (open by default) and get_comment return element-pinned feedback. Apply a batch, verify with screenshots, then set_comment_status to resolved. Use add_comment / update_comment / delete_comment for feedback; comments are saved metadata, never design layers.
 
