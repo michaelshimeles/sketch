@@ -139,6 +139,65 @@ fn artboard_and_html_become_auto_layout_frames_and_text() {
 }
 
 #[test]
+fn font_family_and_weight_pick_the_face() {
+    let mut h = host();
+    let ab = call(
+        &mut h,
+        "create_artboard",
+        json!({"name": "Type", "styles": {"width": "800px", "height": "600px"}}),
+    );
+    let r = call(
+        &mut h,
+        "write_html",
+        json!({
+            "targetNodeId": ab["id"], "mode": "insert-children",
+            "html": r#"<div style="display:flex; flex-direction:column; align-items:start">
+                <p style="font-size:40px; font-weight:400">Hamburgefonstiv</p>
+                <p style="font-size:40px; font-weight:500">Hamburgefonstiv</p>
+                <p style="font-size:40px; font-weight:600">Hamburgefonstiv</p>
+                <p style="font-size:40px; font-family:'No Such Family', Inter, sans-serif; font-weight:500">Hamburgefonstiv</p>
+                <p style="font-size:40px; font-family:'No Such Family'">Hamburgefonstiv</p>
+              </div>"#,
+        }),
+    );
+    let col = num(&r["createdNodeIds"][0]);
+    let kids = h.ed.doc.get(col).unwrap().children.clone();
+    let w = |i: usize| h.ed.doc.get(kids[i]).unwrap().rect.w;
+    // Inter's advances grow with weight, so Medium and SemiBold set wider than Regular.
+    assert!(w(1) > w(0) + 1.0, "500 {} vs 400 {}", w(1), w(0));
+    assert!(w(2) > w(1) + 1.0, "600 {} vs 500 {}", w(2), w(1));
+    // A font stack falls through to the first family that is available.
+    assert!(
+        (w(3) - w(1)).abs() < 0.5,
+        "stack {} vs Inter 500 {}",
+        w(3),
+        w(1)
+    );
+    // A family that isn't installed falls back to Inter.
+    assert!(
+        (w(4) - w(0)).abs() < 0.5,
+        "missing {} vs Inter {}",
+        w(4),
+        w(0)
+    );
+
+    let ids: Vec<Value> = (0..5)
+        .map(|i| {
+            json!(format!(
+                "{}:{}",
+                ab["id"].as_str().unwrap().split(':').next().unwrap(),
+                kids[i].0
+            ))
+        })
+        .collect();
+    let styles = call(&mut h, "get_computed_styles", json!({"nodeIds": ids}));
+    let s = |i: usize| &styles[ids[i].as_str().unwrap()];
+    assert_eq!(s(1)["fontWeight"], "500", "{styles}");
+    assert_eq!(s(3)["fontFamily"], "Inter", "{styles}");
+    assert_eq!(s(4)["fontFamily"], "Inter", "{styles}");
+}
+
+#[test]
 fn reading_tools_describe_the_page() {
     let mut h = host();
     let ab = call(

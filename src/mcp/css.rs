@@ -838,10 +838,18 @@ pub fn apply(n: &mut Node, styles: &[(String, String)], ctx: &Context) -> Applie
                 }
                 _ => false,
             },
+            "fontFamily" if is_text => {
+                n.text_style.font_family = match lower.trim() {
+                    "" | "inherit" | "initial" | "unset" => None,
+                    _ => Some(v.trim().to_string()),
+                };
+                true
+            }
             "flexShrink" | "flexBasis" | "boxSizing" | "minWidth" | "minHeight" | "maxWidth"
             | "maxHeight" | "zIndex" | "cursor" | "whiteSpace" | "fontFamily" | "wordBreak"
             | "overflowWrap" => {
-                // Accepted without an equivalent; harmless. fontFamily: Inter is the only face.
+                // Accepted without an equivalent; harmless. fontFamily is inherited by text
+                // children.
                 !matches!(
                     k.as_str(),
                     "minWidth" | "minHeight" | "maxWidth" | "maxHeight"
@@ -893,12 +901,13 @@ pub fn apply(n: &mut Node, styles: &[(String, String)], ctx: &Context) -> Applie
             },
             "color" => true, // inherited by text children; meaningless on boxes
             "fontWeight" if is_text => {
-                let w = match lower.as_str() {
+                let w: f64 = match lower.as_str() {
                     "bold" | "bolder" => 700.0,
                     "normal" | "lighter" => 400.0,
                     _ => v.parse().unwrap_or(400.0),
                 };
                 n.text_style.bold = w >= 600.0;
+                n.text_style.font_weight = Some(w.clamp(1.0, 1000.0) as u16);
                 true
             }
             "fontStyle" if is_text => {
@@ -1286,12 +1295,11 @@ pub fn computed(n: &Node, parent_layout: Option<&AutoLayout>, is_root: bool) -> 
         NodeKind::Text {
             font_size, align, ..
         } => {
-            put("fontFamily", "Inter".into());
+            let ts = &n.text_style;
+            let face = crate::fonts::resolve(ts.font_family.as_deref(), ts.weight(), ts.italic);
+            put("fontFamily", crate::fonts::family_name(face));
             put("fontSize", px(*font_size));
-            put(
-                "fontWeight",
-                if n.text_style.bold { "700" } else { "400" }.into(),
-            );
+            put("fontWeight", ts.weight().to_string());
             if n.text_style.italic {
                 put("fontStyle", "italic".into());
             }

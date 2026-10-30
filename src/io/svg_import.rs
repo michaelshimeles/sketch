@@ -212,7 +212,7 @@ fn walk(g: &usvg::Group, opacity: f32, out: &mut Vec<Node>) {
 fn options() -> usvg::Options<'static> {
     let mut o = usvg::Options::default();
     let db = o.fontdb_mut();
-    for i in 0..4u8 {
+    for i in 0..4 {
         db.load_font_data(crate::text::face_bytes(i).to_vec());
     }
     db.load_font_data(crate::theme::INTER_MEDIUM.to_vec());

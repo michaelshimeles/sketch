@@ -39,6 +39,7 @@ dirs = "6"
 i_overlay = "9.0.1"
 miniz_oxide = "0.9.1"
 usvg = "0.48"
+fontdb = "0.24"
 arboard = { version = "3.6.1", features = ["image-data"] }
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "base64", "transport-streamable-http-server", "transport-io", "client", "transport-streamable-http-client-reqwest"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros", "time", "io-std"] }

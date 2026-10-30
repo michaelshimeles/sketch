@@ -483,6 +483,13 @@ fn basic_info(host: &mut dyn Host, a: &Args) -> ToolResult {
             })
         })
         .collect();
+    // Families the page's text renders with; Inter always, since it is the default.
+    let mut fonts: BTreeSet<String> = BTreeSet::from(["Inter".to_string()]);
+    for n in doc.nodes.values().filter(|n| n.kind.text().is_some()) {
+        let ts = &n.text_style;
+        let face = crate::fonts::resolve(ts.font_family.as_deref(), ts.weight(), ts.italic);
+        fonts.insert(crate::fonts::family_name(face));
+    }
     let (file_id, file_name, path) = match project {
         Some((id, name, dir)) => (json!(id), json!(name), json!(dir)),
         None => (Value::Null, json!(doc.name), Value::Null),
@@ -496,7 +503,7 @@ fn basic_info(host: &mut dyn Host, a: &Args) -> ToolResult {
         "nodeCount": doc.nodes.len(),
         "artboards": artboards,
         "otherTopLevelLayers": others,
-        "fontFamilies": ["Inter"],
+        "fontFamilies": fonts,
         "selectionCount": if page == ed.active_page { ed.selection.len() } else { 0 },
         "nodeIdFormat": "\"<page>:<n>\", e.g. \"".to_string() + &node_key(ed, page, NodeId(1)) + "\"",
     }))
@@ -840,20 +847,26 @@ fn font_info(a: &Args) -> ToolResult {
         .strs("familyNames")?
         .iter()
         .map(|f| {
-            let inter = f.trim().eq_ignore_ascii_case("inter");
+            let name = f.trim().trim_matches(['"', '\'']);
+            let styles: Vec<Value> = crate::fonts::styles(name)
+                .into_iter()
+                .map(|(w, italic)| {
+                    json!({"weight": w, "style": if italic { "italic" } else { "normal" }})
+                })
+                .collect();
+            let available = crate::fonts::is_available(name);
             json!({
                 "family": f,
-                "available": inter,
-                "styles": if inter { json!([
-                    {"weight": 400, "style": "normal"}, {"weight": 700, "style": "normal"},
-                    {"weight": 400, "style": "italic"}, {"weight": 700, "style": "italic"}]) } else { json!([]) },
-                "note": if inter { "" } else { "not available; text renders in Inter" },
+                "available": available,
+                "styles": styles,
+                "note": if available { "" } else { "not installed; text renders in Inter" },
             })
         })
         .collect();
-    text(
-        json!({"families": fams, "weights": "fontWeight ≥ 600 renders bold, below renders regular"}),
-    )
+    text(json!({
+        "families": fams,
+        "weights": "fontWeight picks the nearest installed weight, as CSS does",
+    }))
 }
 
 fn guide(a: &Args) -> ToolResult {

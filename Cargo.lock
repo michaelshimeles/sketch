@@ -3280,6 +3280,7 @@ dependencies = [
  "egui-winit",
  "env_logger",
  "fastrand",
+ "fontdb",
  "i_overlay",
  "image",
  "log",

@@ -283,6 +283,13 @@ pub struct TextSpan {
 pub struct TextStyle {
     pub bold: bool,
     pub italic: bool,
+    /// CSS `font-family` list (None = Inter). Families that aren't installed fall back to
+    /// Inter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+    /// CSS weight, 1 to 1000. None = 400, or 700 when `bold`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_weight: Option<u16>,
     /// Line height as a multiple of the font size (None = font default).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line_height: Option<f64>,
@@ -296,6 +303,21 @@ impl TextStyle {
     pub fn is_default(&self) -> bool {
         *self == TextStyle::default()
     }
+
+    /// The node's weight. `bold` wins when it disagrees with `font_weight`, so toggling
+    /// bold on a 500-weight text switches it to 700 and back to 400.
+    pub fn weight(&self) -> u16 {
+        weight_for(self.bold, self.font_weight)
+    }
+}
+
+/// `weight` when it agrees with `bold` (600 and up is bold), else 700 or 400.
+fn weight_for(bold: bool, weight: Option<u16>) -> u16 {
+    match weight {
+        Some(w) if (w >= 600) == bold => w,
+        _ if bold => 700,
+        _ => 400,
+    }
 }
 
 /// Resolved style of one character.
@@ -303,6 +325,8 @@ impl TextStyle {
 pub struct CharStyle {
     pub bold: bool,
     pub italic: bool,
+    /// CSS weight; `bold` is `weight >= 600`.
+    pub weight: u16,
     pub size: f64,
     pub color: Color,
     pub underline: bool,
@@ -314,6 +338,7 @@ impl TextStyle {
         let mut s = CharStyle {
             bold: self.bold,
             italic: self.italic,
+            weight: self.weight(),
             size,
             color,
             underline: false,
@@ -323,6 +348,7 @@ impl TextStyle {
             if i >= sp.start && i < sp.end {
                 if let Some(b) = sp.bold {
                     s.bold = b;
+                    s.weight = weight_for(b, Some(s.weight));
                 }
                 if let Some(b) = sp.italic {
                     s.italic = b;

@@ -204,7 +204,13 @@ impl Tess {
         }
     }
 
-    fn glyphs(&mut self, face: u8, size: f64, color: [f32; 4], glyphs: &[(u16, V2)]) -> Mesh {
+    fn glyphs(
+        &mut self,
+        face: text::FaceId,
+        size: f64,
+        color: [f32; 4],
+        glyphs: &[(u16, V2)],
+    ) -> Mesh {
         let mut m = Mesh::default();
         if size * self.zoom < 2.5 {
             // Too small to read: a faint bar per glyph run ("greeking").

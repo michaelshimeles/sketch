@@ -303,8 +303,9 @@ Known gaps), ⏳ planned in a later milestone, ❌ not planned.
 * **Pen pressure.** winit 0.30 does not expose tablet pressure for pen events that arrive as
   mouse input, which is common with macOS and Wacom tablets. Pressure comes from touch/pen
   `force` when the platform reports it. Otherwise it is simulated from stroke velocity.
-* **Text** uses Inter (regular, bold, italic, bold italic) with no shaping, so there are no
-  ligatures, complex scripts or RTL, and no font picker. IME preedit is not displayed
+* **Text** uses Inter by default, or any font installed on the system that a CSS
+  `font-family` names (through MCP; there is no font picker yet). There is no shaping, so
+  there are no ligatures, complex scripts or RTL. IME preedit is not displayed
   (committed text works).
 * **No rotation.** Nodes are axis-aligned boxes; rotated imports are baked into paths.
 * **Undo granularity.** Document renames from the Design panel are not undoable, and the

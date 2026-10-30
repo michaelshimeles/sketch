@@ -1,9 +1,11 @@
 //! Text layout and glyph outlines.
 //!
 //! Text is rendered as vector glyph outlines, so it stays crisp at every zoom level and
-//! exports to SVG without font dependencies. The face is Inter Regular (SIL OFL, bundled in assets/fonts),
-//! not anything taken from Paper.
+//! exports to SVG without font dependencies. The default face is Inter (SIL OFL, bundled in
+//! assets/fonts), not anything taken from Paper. Text that names another family uses that
+//! font when it is installed on the system (see [`crate::fonts`]).
 
+use crate::fonts;
 use crate::geom::{V2, v2};
 use crate::model::{CharStyle, Color, TextAlign, TextStyle};
 use crate::vector::VPath;
@@ -17,46 +19,61 @@ static BOLD: &[u8] = include_bytes!("../assets/fonts/Inter-Bold.ttf");
 static ITALIC: &[u8] = include_bytes!("../assets/fonts/Inter-Italic.ttf");
 static BOLD_ITALIC: &[u8] = include_bytes!("../assets/fonts/Inter-BoldItalic.ttf");
 
-/// Face index: bit 0 = bold, bit 1 = italic.
-pub type FaceId = u8;
+/// Face index. 0 to 3 are Inter with bit 0 = bold and bit 1 = italic, 4 and 5 are Inter
+/// Medium and SemiBold, and ids from [`fonts::FIRST_SYSTEM_FACE`] are system fonts.
+pub type FaceId = u16;
 
 pub fn face_id(bold: bool, italic: bool) -> FaceId {
-    bold as u8 | (italic as u8) << 1
+    bold as FaceId | (italic as FaceId) << 1
 }
 
+/// Bytes of a bundled Inter face (ids 0 to 5).
 pub fn face_bytes(id: FaceId) -> &'static [u8] {
-    match id & 3 {
+    match id {
         0 => FONT_BYTES,
         1 => BOLD,
         2 => ITALIC,
+        fonts::INTER_MEDIUM => crate::theme::INTER_MEDIUM,
+        fonts::INTER_SEMIBOLD => crate::theme::INTER_SEMIBOLD,
         _ => BOLD_ITALIC,
     }
 }
 
 pub fn face_of(id: FaceId) -> &'static ttf_parser::Face<'static> {
-    static FACES: OnceLock<[ttf_parser::Face<'static>; 4]> = OnceLock::new();
-    &FACES.get_or_init(|| {
-        [0, 1, 2, 3]
+    static FACES: OnceLock<[ttf_parser::Face<'static>; 6]> = OnceLock::new();
+    let bundled = FACES.get_or_init(|| {
+        [0, 1, 2, 3, 4, 5]
             .map(|i| ttf_parser::Face::parse(face_bytes(i), 0).expect("bundled font parses"))
-    })[(id & 3) as usize]
+    });
+    match bundled.get(id as usize) {
+        Some(f) => f,
+        None => fonts::system_face(id).unwrap_or(&bundled[0]),
+    }
 }
 
 pub fn face() -> &'static ttf_parser::Face<'static> {
     face_of(0)
 }
 
-fn units_per_em() -> f64 {
-    face().units_per_em() as f64
-}
-
 pub fn line_height(font_size: f64) -> f64 {
-    let f = face();
-    let h = (f.ascender() as f64 - f.descender() as f64 + f.line_gap() as f64) / units_per_em();
-    font_size * h.max(1.1)
+    line_height_in(0, font_size)
 }
 
 pub fn ascent(font_size: f64) -> f64 {
-    face().ascender() as f64 / units_per_em() * font_size
+    ascent_in(0, font_size)
+}
+
+/// Natural line height of a face at `font_size` (at least 1.1 × the size).
+pub fn line_height_in(face: FaceId, font_size: f64) -> f64 {
+    let f = face_of(face);
+    let h = (f.ascender() as f64 - f.descender() as f64 + f.line_gap() as f64)
+        / f.units_per_em() as f64;
+    font_size * h.max(1.1)
+}
+
+pub fn ascent_in(face: FaceId, font_size: f64) -> f64 {
+    let f = face_of(face);
+    f.ascender() as f64 / f.units_per_em() as f64 * font_size
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,6 +125,35 @@ fn advance_in(face: FaceId, c: char, font_size: f64) -> (u16, f64) {
     (gid, adv / f.units_per_em() as f64 * font_size)
 }
 
+/// The face that draws `c` for a style: the style's own face, or Inter when a system
+/// font has no glyph for the character.
+fn face_for(
+    ts: &TextStyle,
+    s: &CharStyle,
+    c: char,
+    cache: &mut Vec<(u16, bool, FaceId)>,
+) -> FaceId {
+    let face = match cache
+        .iter()
+        .find(|(w, i, _)| (*w, *i) == (s.weight, s.italic))
+    {
+        Some((_, _, f)) => *f,
+        None => {
+            let f = fonts::resolve(ts.font_family.as_deref(), s.weight, s.italic);
+            cache.push((s.weight, s.italic, f));
+            f
+        }
+    };
+    if face >= fonts::FIRST_SYSTEM_FACE
+        && !c.is_whitespace()
+        && face_of(face).glyph_index(c).is_none()
+    {
+        fonts::inter(s.weight, s.italic)
+    } else {
+        face
+    }
+}
+
 #[cfg(test)]
 fn advance(c: char, font_size: f64) -> (u16, f64) {
     advance_in(0, c, font_size)
@@ -139,17 +185,26 @@ pub fn layout_rich(
         .map(|i| ts.char_style(i, font_size, color))
         .collect();
     let ls = ts.letter_spacing;
+    let mut faces_by_style = Vec::new();
+    let faces: Vec<FaceId> = chars
+        .iter()
+        .zip(&styles)
+        .map(|(c, s)| face_for(ts, s, *c, &mut faces_by_style))
+        .collect();
     let adv: Vec<(u16, f64)> = chars
         .iter()
         .zip(&styles)
-        .map(|(c, s)| {
-            let (g, a) = advance_in(face_id(s.bold, s.italic), *c, s.size);
+        .zip(&faces)
+        .map(|((c, s), f)| {
+            let (g, a) = advance_in(*f, *c, s.size);
             (g, a + ls)
         })
         .collect();
+    // Line metrics come from the node's own face, so every line of a paragraph matches.
+    let base = fonts::resolve(ts.font_family.as_deref(), ts.weight(), ts.italic);
     let lh_of = |size: f64| match ts.line_height {
         Some(m) => size * m,
-        None => line_height(size),
+        None => line_height_in(base, size),
     };
     // Break into lines: hard breaks on '\n', soft breaks at spaces when wrapping.
     let mut ranges: Vec<(usize, usize)> = Vec::new();
@@ -206,8 +261,8 @@ pub fn layout_rich(
                     .map_or(font_size, |c| c.size)
             });
         let lh = lh_of(max_size);
-        let natural = line_height(max_size);
-        let baseline = top + ascent(max_size) + (lh - natural) * 0.5;
+        let natural = line_height_in(base, max_size);
+        let baseline = top + ascent_in(base, max_size) + (lh - natural) * 0.5;
         let mut x = 0.0;
         let mut carets = vec![0.0];
         for i in s..e {
@@ -215,7 +270,7 @@ pub fn layout_rich(
             let (gid, a) = adv[i];
             glyphs.push(PlacedGlyph {
                 gid,
-                face: face_id(st.bold, st.italic),
+                face: faces[i],
                 size: st.size,
                 color: st.color,
                 x,
@@ -354,7 +409,7 @@ fn tessellate_glyph(face: FaceId, gid: u16) -> GlyphMesh {
     }
     let path = b.b.build();
     let mut buffers: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
-    let tol = (units_per_em() / 2000.0) as f32;
+    let tol = (face_of(face).units_per_em() as f64 / 2000.0) as f32;
     let _ = FillTessellator::new().tessellate_path(
         &path,
         &FillOptions::tolerance(tol).with_fill_rule(lyon::tessellation::FillRule::NonZero),

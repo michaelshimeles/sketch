@@ -5,6 +5,7 @@ pub mod assets;
 pub mod connector;
 pub mod demo;
 pub mod editor;
+pub mod fonts;
 pub mod geom;
 pub mod history;
 pub mod ink;
